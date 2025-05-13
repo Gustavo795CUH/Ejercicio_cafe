@@ -94,7 +94,7 @@
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.7.1/firebase-app.js";
     import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.7.1/firebase-auth.js";
-    import { getFirestore, collection, addDoc, getDocs, query, orderBy } from "https://www.gstatic.com/firebasejs/11.7.1/firebase-firestore.js";
+    import { getFirestore, collection, addDoc, getDocs, query, orderBy, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/11.7.1/firebase-firestore.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyDVoxkVdKMm9INqPsZO1LZSZ-SCwbUWor8",
@@ -154,6 +154,7 @@
     });
 
     window.logout = async () => {
+      if (!confirm("¿Deseas cerrar sesión?")) return;
       try {
         await signOut(auth);
         alert("Sesión cerrada.");
@@ -167,12 +168,18 @@
     };
 
     window.crearTicket = async () => {
-      const cliente = document.getElementById("cliente").value;
-      const pais = document.getElementById("pais").value;
-      const kg = document.getElementById("kg").value;
-      const producto = document.getElementById("producto").value;
+      const cliente = document.getElementById("cliente").value.trim();
+      const pais = document.getElementById("pais").value.trim();
+      const kg = document.getElementById("kg").value.trim();
+      const producto = document.getElementById("producto").value.trim();
       const prioridad = document.getElementById("prioridad").value;
-      const descripcion = document.getElementById("descripcion").value;
+      const descripcion = document.getElementById("descripcion").value.trim();
+
+      if (!cliente || !pais || !kg || !producto || !descripcion) {
+        alert("Por favor completa todos los campos.");
+        return;
+      }
+
       const folio = 'TCK-' + Date.now();
 
       await addDoc(collection(db, "tickets"), {
@@ -193,12 +200,23 @@
       document.getElementById("descripcion").value = "";
     };
 
+    window.eliminarTicket = async (id) => {
+      if (confirm("¿Estás seguro de eliminar este ticket?")) {
+        await deleteDoc(doc(db, "tickets", id));
+        alert("Ticket eliminado exitosamente.");
+        cargarTickets();
+      }
+    };
+
     window.cargarTickets = async () => {
       const lista = document.getElementById("tickets-list");
       lista.innerHTML = "";
       const q = query(collection(db, "tickets"), orderBy("folio", "desc"));
       const snapshot = await getDocs(q);
       const contadores = { Alta: 0, Media: 0, Baja: 0 };
+      if (snapshot.empty) {
+        lista.innerHTML = "<div class='alert alert-info'>No hay tickets registrados.</div>";
+      }
       snapshot.forEach(doc => {
         const t = doc.data();
         contadores[t.prioridad]++;
@@ -208,6 +226,7 @@
             <p class="card-text">${t.descripcion} <br><strong>Producto:</strong> ${t.producto} - <strong>Kg:</strong> ${t.kg}</p>
             <span class="badge bg-info">${t.estado}</span>
             <button class="btn btn-outline-danger btn-sm float-end" onclick="exportarPDF('${t.folio}', '${t.cliente}', '${t.pais}', '${t.descripcion}', '${t.prioridad}', '${t.producto}', '${t.kg}')"><i class="fa fa-file-pdf"></i> PDF</button>
+            <button class="btn btn-danger btn-sm float-end me-2" onclick="eliminarTicket('${doc.id}')"><i class="fa fa-trash"></i> Eliminar</button>
           </div>
         </div>`;
         lista.innerHTML += card;
